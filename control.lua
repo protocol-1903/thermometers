@@ -1,12 +1,17 @@
 script.on_init(function()
   storage = {
-    thermometers = {}
+    thermometers = {},
+    num = 0,
+    batch_size = 0
   }
 end)
 
 script.on_configuration_changed(function()
   storage = {
-    thermometers = storage.thermometers or {}
+    thermometers = storage.thermometers or {},
+    next_index = storage.next_index,
+    num = storage.num or 0,
+    batch_size = storage.batch_size or 0
   }
 end)
 
@@ -42,6 +47,7 @@ function (event)
   })
 
   -- save for later
+  storage.num = storage.num + 1
   storage.thermometers[tank.unit_number] = {
     tank = tank,
     monitor = monitor
@@ -59,6 +65,7 @@ script.on_event({
 function (event)
   local tank = event.entity
   if not tank.valid or not storage.thermometers[tank.unit_number] then return end
+  storage.num = storage.num - 1
   storage.thermometers[tank.unit_number].monitor.destroy()
   storage.thermometers[tank.unit_number] = nil
 end)
@@ -69,17 +76,23 @@ script.on_event(defines.events.on_runtime_mod_setting_changed, function()
   batch_count = settings.global["fluid-temperature-update-rate"].value
 end)
 
+-- run batches every tick
 script.on_event(defines.events.on_tick, function (event)
-  -- run batches every tick
-  for index, metadata in pairs(storage.thermometers) do
-    if metadata.tank.valid then
-      if event.tick % batch_count == index % batch_count and not metadata.tank.to_be_deconstructed() then
-        monitor.get_control_behavior().get_section(1).multiplier = math.floor((tank.get_fluid(1) or {}).temperature or 0)
-      end
-    else
+  -- update the size of each batch at the start of the loop so everything updates at the same rate
+  if event.tick % batch_count == 0 then
+    storage.batch_size = math.ceil(storage.num / batch_count)
+  end
+
+  for _ = 1, storage.batch_size do
+    local metadata, next_index = next(storage.thermometers, storage.next_index)
+    if metadata.tank.valid and not metadata.tank.to_be_deconstructed() then
+      metadata.monitor.get_control_behavior().get_section(1).multiplier = math.floor((metadata.tank.get_fluid(1) or {}).temperature or 0)
+    elseif not metadata.tank.valid then
+      storage.num = storage.num - 1
       metadata.monitor.destroy()
-      storage.thermometers[index] = nil
+      storage.thermometers[storage.next_index] = nil
     end
+    storage.next_index = next_index
   end
 end)
 
