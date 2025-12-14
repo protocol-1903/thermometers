@@ -78,6 +78,7 @@ end)
 
 -- run batches every tick
 script.on_event(defines.events.on_tick, function (event)
+  game.print(serpent.block(storage), {skip = defines.print_skip.never, sound = defines.print_sound.never})
   -- update the size of each batch at the start of the loop so everything updates at the same rate
   if event.tick % batch_count == 0 then
     storage.batch_size = math.ceil(storage.num / batch_count)
@@ -85,9 +86,9 @@ script.on_event(defines.events.on_tick, function (event)
 
   for _ = 1, storage.batch_size do
     local metadata, next_index = next(storage.thermometers, storage.next_index)
-    if metadata.tank.valid and not metadata.tank.to_be_deconstructed() then
+    if metadata.tank.valid then
       metadata.monitor.get_control_behavior().get_section(1).multiplier = math.floor((metadata.tank.get_fluid(1) or {}).temperature or 0)
-    elseif not metadata.tank.valid then
+    else
       storage.num = storage.num - 1
       metadata.monitor.destroy()
       storage.thermometers[storage.next_index] = nil
@@ -108,50 +109,106 @@ local function update_gui(player_index)
   if not player_index then return end
 
   local player = game.get_player(player_index)
-  local entity = player.opened.entity
+  local entity = player.opened
 
   if not entity then return end
 
+  if entity.type ~= "storage-tank" or entity.type == "entity-ghost" and entity.ghost_type ~= "storage-tank" then return end
+
   local window = player.gui.relative.thermometer
+
+  local monitor = storage.thermometers[entity.unit_number] and storage.thermometers[entity.unit_number].monitor
+  local signal = monitor and monitor.get_control_behavior().get_section(1).get_slot(1).value
 
   -- if window content does not exist (mod version change or fresh install)
   if not window then
-    -- create new window
-
+    -- recreate main gui
     window = player.gui.relative.add{
       type = "frame",
       name = "thermometer",
-      caption = { "thermometer-window.frame" },
-      direction = "vertical",
+      style = "invisible_frame",
       anchor = {
         gui = defines.relative_gui_type.storage_tank_gui,
         position = defines.relative_gui_position.right
       }
-    }.add{
+    }
+
+    -- add a button to open the settings window
+    window.add{
       type = "frame",
+      name = "mini-frame"
+    }.add{
+      type = "sprite-button",
+      name = "show-thermometer-settings",
+      style = "frame_action_button",
+      sprite = "utility/circuit_network_panel",
+      tooltip = {"tooltip.show-thermometer-settings"}
+    }
+
+    -- add main settings window
+    local main_frame = window.add{
+      type = "frame",
+      name = "main-frame",
+      direction = "vertical"
+    }
+    main_frame.visible = false
+    main_frame.add{
+      type = "flow",
+      name = "titlebar",
+      direction = "horizontal"
+    }.add{
+      type = "sprite-button",
+      name = "hide-thermometer-settings",
+      style = "close_button",
+      sprite = "utility/circuit_network_panel",
+      auto_toggle = false,
+      toggled = true
+    }
+    local header = main_frame.titlebar.add{
+      type = "empty-widget",
+      style = "draggable_space_header"
+    }
+    header.style.horizontally_stretchable = true
+    header.style.natural_height = 24
+    header.style.height = 24
+    header.style.right_margin = 5
+    main_frame.titlebar.add{
+      type = "label",
+      style = "frame_title",
+      -- caption = {"gui-control-behavior-modes.read-temperature"}
+    }
+    
+    main_frame = main_frame.add{
+      type = "frame",
+      name = "sub-frame",
       style = "inside_shallow_frame_with_padding_and_vertical_spacing",
       direction = "vertical"
     }
-    subheader = window.add{
-      type = "frame",
-      style = "subheader_frame"
+    -- add circuit network toggles
+    main_frame.add{
+      type = "checkbox",
+      style = "caption_checkbox",
+      caption = {"gui-control-behavior-modes.enable-disable"},
+      state = false
     }
-    subheader.style.left_margin = -12
-    subheader.style.right_margin = -12
-    subheader.style.top_margin = -12
-    subheader.style.bottom_margin = 8
-    subheader.style.horizontally_squashable = true
-    subheader.style.horizontally_stretchable = true
-    subheader = subheader.add{
+    local sub_frame = main_frame.add{
       type = "flow",
-      style = "player_input_horizontal_flow",
-      direction = "horizontal"
+      name = "circuit_condition",
+      direction = "horizontal",
+      style = "player_input_horizontal_flow"
     }
-    subheader.style.left_padding = 12
-    subheader.style.right_padding = 12
-    -- subheader.add{
+    sub_frame.add{
+      type = "label",
+      caption = {"gui-control-behavior-modes-guis.temperature"}
+    }.enabled = false
+    sub_frame.add{
+      type = "choose-elem-button",
+      elem_type = "signal",
+      style = "slot_button_in_shallow_frame",
+      signal = signal or {type = "virtual", name = "signal-T", quality = "normal"}
+    }.enabled = false
 
-    -- }
+
   else -- update data to reflect current state
 
   end
@@ -160,6 +217,25 @@ end
 script.on_event(defines.events.on_gui_opened, function (event)
   if not event.entity or not event.entity.type == "storage-tank" then return end
   update_gui(event.player_index)
+end)
+
+script.on_event(defines.events.on_gui_click, function (event)
+  local button = event.element
+  if not button or not button.valid then return end
+  if button.get_mod() ~= "thermometers" then return end
+
+  if button.name == "show-thermometer-settings" then
+    local base = button.parent.parent
+    button.parent.visible = false
+    base["main-frame"].visible = true
+  elseif button.name == "hide-thermometer-settings" then
+    local base = button.parent.parent.parent
+    button.parent.parent.visible = false
+    base["mini-frame"].visible = true
+  elseif button.type == "checkbox" then
+    -- enable/disable temperature reading
+
+  end
 end)
 
 -- script.on_event(defines.events.on_gui_click, function (event)
