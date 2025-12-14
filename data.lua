@@ -5,6 +5,7 @@ data:extend{{ -- hidden combinator to mimic negative of network state
   collision_mask = {layers = {}},
   activity_led_light_offsets = {{0, 0}, {0, 0}, {0, 0}, {0, 0}},
   circuit_wire_connection_points = {{wire = {}, shadow = {}}, {wire = {}, shadow = {}}, {wire = {}, shadow = {}}, {wire = {}, shadow = {}}},
+  circuit_wire_max_distance = 0,
   flags = {
     "not-rotatable",
     "placeable-neutral",
