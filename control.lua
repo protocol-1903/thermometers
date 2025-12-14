@@ -92,6 +92,7 @@ local function update_gui(player_index)
       direction = "horizontal"
     }.add{
       type = "sprite-button",
+      name = "button",
       style = "close_button",
       sprite = "utility/circuit_network_panel",
       auto_toggle = true,
@@ -200,6 +201,16 @@ script.on_event(defines.events.on_gui_click, function (event)
   end
 
   update_gui(event.player_index)
+end)
+
+script.on_event(defines.events.on_gui_closed, function (event)
+  local player = game.get_player(event.player_index)
+  local entity = event.entity
+  local window = player.gui.relative.thermometer
+  if not entity or entity.type ~= "storage-tank" or entity.type == "entity-ghost" and entity.ghost_type ~= "storage-tank" or not window then return end
+  window.titlebar.button.toggled = false
+  window.titlebar.header.visible = false
+  window.main.visible = false
 end)
 
 ---@param event EventData.on_gui_elem_changed
