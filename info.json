@@ -1,6 +1,6 @@
 {
   "name": "thermometers",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "title": "Thermometers",
   "description": "Allows you to read the temperature of fluids via tanks. Disabled by default, click to enable on tanks.",
   "author": "protocol_1903",
